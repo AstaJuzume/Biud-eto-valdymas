@@ -1,0 +1,1245 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280">
+<title>Versina | Objektų biudžeto kontrolė</title>
+<style>
+:root {
+  --font: "Segoe UI", system-ui, sans-serif;
+  --canvas: #F8F7F6;
+  --surface: #FFFFFF;
+  --border: #E0E0E0;
+  --radius: 8px;
+  --text-primary: #1A1A1A;
+  --text-secondary: #6B7280;
+  --text-muted: #9E9E9E;
+  --accent: #3B4B8C; /* Versina logotipo mėlyna */
+  --success: #16A34A;
+  --warning: #D97706;
+  --danger: #DC2626;
+  --series-b: #9CA3AF;
+  --row-alt: #FAFAFA;
+  --row-hover: #EEF1F9;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0; width: 100%; height: 100%;
+  background: #D1D5DB;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font);
+  color: var(--text-primary);
+}
+.report-canvas {
+  width: 1280px; height: 720px; flex-shrink: 0; overflow: hidden;
+  display: flex; flex-direction: column;
+  background: var(--canvas);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+  position: relative;
+}
+button { font-family: var(--font); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ---------- Topbar ---------- */
+.topbar {
+  height: 50px; flex-shrink: 0; background: var(--accent);
+  display: flex; align-items: center; gap: 24px; padding: 0 16px;
+}
+.brand { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.brand-name { color: #FFFFFF; font-size: 14px; font-weight: 700; white-space: nowrap; }
+.brand-sep { color: rgba(255,255,255,0.4); font-size: 14px; }
+.brand-report { color: rgba(255,255,255,0.85); font-size: 13px; font-weight: 400; white-space: nowrap; }
+.tabs { display: flex; gap: 4px; }
+.tab {
+  border: none; background: transparent; color: rgba(255,255,255,0.75);
+  font-size: 12px; padding: 7px 14px; border-radius: 6px; cursor: pointer; white-space: nowrap;
+}
+.tab:hover { color: #FFFFFF; background: rgba(255,255,255,0.12); }
+.tab.active { background: #FFFFFF; color: var(--accent); font-weight: 600; }
+.tab:focus-visible { outline: 2px solid #FFFFFF; outline-offset: 2px; }
+.timestamp { margin-left: auto; font-size: 11px; color: rgba(255,255,255,0.7); background: none; border: none; padding: 0; white-space: nowrap; }
+
+/* ---------- Filter bar ---------- */
+.filterbar {
+  height: 52px; flex-shrink: 0;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 12px;
+  padding: 4px 16px; box-sizing: border-box;
+}
+.filter { display: flex; flex-direction: column; gap: 4px; }
+.filter label { display: block; font-size: 11px; color: var(--text-secondary); line-height: 1; white-space: nowrap; }
+.filter select {
+  height: 26px; font-size: 11px; border: 1px solid var(--border); border-radius: 4px;
+  background: var(--surface); color: var(--text-primary); padding: 4px 6px; box-sizing: border-box;
+  font-family: var(--font);
+}
+.filter select:disabled { color: var(--text-muted); background: var(--row-alt); }
+.filter-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.btn-reset-filters, .btn-ghost {
+  font-size: 11px; height: 28px; padding: 0 10px; border: 1px solid var(--border); border-radius: 4px;
+  background: var(--surface); color: var(--text-secondary); cursor: pointer; white-space: nowrap;
+}
+.btn-reset-filters:hover, .btn-ghost:hover { background: #F3F4F6; color: var(--text-primary); }
+.btn-ghost.small { height: 24px; padding: 0 8px; }
+[hidden] { display: none !important; }
+
+/* ---------- Content / pages ---------- */
+.content { flex: 1; min-height: 0; overflow: hidden; }
+.page {
+  display: none; flex-direction: column; height: 100%; min-height: 0; overflow: hidden;
+  padding: 12px 16px; gap: 12px;
+}
+.page.active { display: flex; }
+
+/* ---------- KPI ---------- */
+.kpi-row { display: flex; gap: 12px; height: 88px; flex-shrink: 0; }
+.kpi {
+  flex: 1; min-width: 0; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px 16px;
+  display: flex; flex-direction: column; justify-content: center;
+}
+.kpi.wide { flex: 1.45; }
+.kpi-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kpi-value { font-size: 24px; font-weight: 700; color: var(--text-primary); white-space: nowrap; font-variant-numeric: tabular-nums; line-height: 1.15; }
+.kpi-value.neg { color: var(--danger); }
+.kpi-sub { font-size: 11px; color: var(--text-muted); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kpi-delta { font-size: 11px; font-weight: 600; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kpi-delta.bad { color: var(--danger); }
+.kpi-delta.good { color: var(--success); }
+.kpi-delta.neutral { color: var(--text-muted); font-weight: 400; }
+.kpi-multi-row { display: flex; gap: 14px; align-items: baseline; }
+.status-item { display: inline-flex; align-items: baseline; gap: 5px; white-space: nowrap; }
+.status-item .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; align-self: center; }
+.status-item .count { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.status-item .label { font-size: 11px; color: var(--text-secondary); }
+
+/* ---------- Status (dot + text) ----------
+   Mapping: Norma → success, Dėmesio → warning, Viršyta → danger.
+   Viršyta: faktas kaupiamai > biudžetas. Dėmesio: laikotarpio faktas > laikotarpio planas daugiau nei 5 %. */
+.status { display: inline-flex; align-items: center; gap: 5px; font-weight: 500; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.status-good, .status-item.status-good { color: var(--success); }
+.status-warn, .status-item.status-warn { color: var(--warning); }
+.status-bad, .status-item.status-bad { color: var(--danger); }
+.status-neutral { color: var(--text-muted); }
+
+/* ---------- Panels & tables ---------- */
+.panel {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  display: flex; flex-direction: column; min-height: 0; overflow: hidden;
+}
+.panel-fill { flex: 1; }
+.table-title { font-size: 13px; font-weight: 600; color: var(--text-primary); padding: 12px 16px 8px; flex-shrink: 0; white-space: nowrap; }
+.table-title .hint { font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 8px; }
+.table-wrap { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; }
+table { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0; font-size: 11px; }
+thead th {
+  position: sticky; top: 0; z-index: 1;
+  color: var(--text-secondary); font-weight: 600; font-size: 11px; text-transform: none;
+  padding: 8px 10px; border-bottom: 1px solid var(--border); background: var(--row-alt);
+  text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+thead th.num { text-align: right; }
+tbody td {
+  color: var(--text-primary); padding: 7px 10px; border-bottom: 1px solid #F3F4F6;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 0;
+}
+tbody tr:nth-child(even) td { background: var(--row-alt); }
+td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.code { color: var(--text-secondary); margin-right: 6px; font-variant-numeric: tabular-nums; }
+tr.drill { cursor: context-menu; }
+tr.drill:hover td { background: var(--row-hover); }
+tr.drill.selected td { background: var(--row-hover); box-shadow: inset 0 -1px 0 var(--accent); }
+tr.drill:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+tfoot td {
+  position: sticky; bottom: 0; z-index: 1;
+  background: var(--row-alt); border-top: 2px solid var(--border);
+  font-weight: 700; padding: 7px 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 0;
+}
+tfoot td.total-label { color: var(--text-secondary); }
+.neg, .delta-bad { color: var(--danger); font-weight: 600; }
+.delta-good { color: var(--success); font-weight: 600; }
+td.empty { text-align: center; color: var(--text-secondary); padding: 28px 10px; background: var(--surface) !important; }
+
+/* Matrix (hierarchy) */
+.group-row td { background: #F3F4F6 !important; font-weight: 700; font-size: 11px; padding: 6px 10px; cursor: pointer; }
+.group-row:hover td { background: #E9EBEF !important; }
+.group-header { user-select: none; }
+.toggle-icon { font-size: 9px; margin-right: 6px; color: var(--text-secondary); display: inline-block; width: 10px; }
+.child-row td { font-size: 11px; padding: 5px 10px; }
+.child-label { padding-left: 24px !important; color: #374151 !important; }
+
+/* ---------- Charts ---------- */
+.chart-row { display: flex; flex: 1; min-height: 0; gap: 12px; }
+.chart-panel {
+  flex: 1; min-width: 0; min-height: 0; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 10px 14px 8px; display: flex; flex-direction: column;
+}
+.chart-head { display: flex; align-items: flex-start; gap: 12px; flex-shrink: 0; margin-bottom: 6px; }
+.chart-title { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.chart-sub { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+.legend { margin-left: auto; display: flex; gap: 12px; align-items: center; font-size: 11px; color: var(--text-secondary); padding-top: 2px; white-space: nowrap; }
+.legend .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.chart-wrap { flex: 1; min-height: 0; position: relative; }
+.chart-wrap canvas { display: block; }
+.chart-tip {
+  position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.10); padding: 7px 10px; font-size: 11px;
+  color: var(--text-primary); white-space: nowrap; z-index: 5; display: none; line-height: 1.55;
+}
+.chart-tip b { font-weight: 600; }
+.p2-table-panel { height: 250px; flex-shrink: 0; }
+#p3-kpis .kpi-value { font-size: 20px; }
+#p3-kpis .kpi { padding: 12px 14px; }
+
+/* ---------- Detail page ---------- */
+.detail-head {
+  flex-shrink: 0; display: flex; align-items: center; gap: 16px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 16px;
+}
+.btn-back {
+  font-size: 12px; height: 30px; padding: 0 12px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--surface); color: var(--text-primary); cursor: pointer; white-space: nowrap;
+}
+.btn-back:hover { background: #F3F4F6; }
+.detail-title { font-size: 15px; font-weight: 700; color: var(--text-primary); white-space: nowrap; }
+.detail-meta { font-size: 11px; color: var(--text-secondary); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.detail-text { min-width: 0; }
+
+/* ---------- Context menu ---------- */
+.ctx-menu {
+  position: fixed; background: #FFFFFF; border: 1px solid #E0E0E0; border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12); padding: 4px 0; min-width: 180px; z-index: 1000; display: none;
+}
+.ctx-menu.visible { display: block; }
+.ctx-item {
+  padding: 8px 14px; font-size: 12px; color: #1A1A1A; cursor: pointer;
+  display: flex; align-items: center; gap: 8px; user-select: none;
+  border: none; background: transparent; width: 100%; text-align: left;
+}
+.ctx-item:hover, .ctx-item:focus-visible { background: #EEF1F9; outline: none; }
+.ctx-icon { font-size: 13px; color: var(--accent); }
+.ctx-cancel { color: #6B7280; border-top: 1px solid #F3F4F6; margin-top: 2px; }
+.app-back-link { color: #fff; text-decoration: none; font: 12px var(--font); white-space: nowrap; padding: 7px 10px; border: 1px solid rgba(255,255,255,.45); border-radius: 4px; }
+.app-back-link:hover { background: rgba(255,255,255,.12); }
+</style>
+</head>
+<body>
+<div class="report-canvas">
+  <div class="topbar">
+    <div class="brand">
+      <span class="brand-name">Versina</span>
+      <span class="brand-sep">|</span>
+      <span class="brand-report">Objektų biudžeto kontrolė</span>
+    </div>
+    <nav class="tabs" aria-label="Ataskaitos puslapiai">
+      <button type="button" class="tab active" data-page="p1">Objektų suvestinė</button>
+      <button type="button" class="tab" data-page="p2">Sąnaudų kategorijos</button>
+    </nav>
+    <div class="timestamp" id="ts"></div>
+    <a class="app-back-link" href="./index.html">Grįžti į aplikaciją</a>
+  </div>
+
+  <div class="filterbar">
+    <div class="filter"><label for="f-year">Metai</label><select id="f-year" style="width:80px" onchange="applyFilters()"></select></div>
+    <div class="filter"><label for="f-month">Mėnesis</label><select id="f-month" style="width:110px" onchange="applyFilters()"></select></div>
+    <div class="filter"><label for="f-obj">Objektas</label><select id="f-obj" style="width:200px" onchange="applyFilters()"></select></div>
+    <div class="filter"><label for="f-pm">Projekto vadovas</label><select id="f-pm" style="width:150px" onchange="applyFilters()"></select></div>
+    <div class="filter"><label for="f-cat">Sąnaudų kategorija</label><select id="f-cat" style="width:160px" onchange="applyFilters()"></select></div>
+    <div class="filter"><label for="f-stage">Etapas</label><select id="f-stage" style="width:104px" onchange="applyFilters()"></select></div>
+    <div class="filter-right">
+      <button type="button" class="btn-ghost" id="chip-chart" hidden></button>
+      <button type="button" class="btn-reset-filters" id="btn-reset">Atstatyti filtrus</button>
+    </div>
+  </div>
+
+  <div class="content">
+    <!-- P1: Objektų suvestinė -->
+    <div class="page active" id="p1">
+      <div class="kpi-row" id="p1-kpis"></div>
+      <div class="panel panel-fill">
+        <div class="table-title">Objektų biudžeto vykdymas<span class="hint">— dešiniu pelės mygtuku spustelėkite eilutę ir pasirinkite „Detali peržiūra“</span></div>
+        <div class="table-wrap">
+          <table id="p1-table">
+            <colgroup>
+              <col style="width:258px"><col style="width:140px"><col style="width:112px"><col style="width:112px"><col style="width:110px">
+              <col style="width:80px"><col style="width:106px"><col style="width:106px"><col style="width:106px"><col style="width:88px">
+            </colgroup>
+            <thead><tr>
+              <th>Objektas</th><th>Projekto vadovas</th><th class="num">Biudžetas</th><th class="num">Faktas kaupiamai</th>
+              <th class="num">Likutis</th><th class="num">Panaudota</th><th class="num">Laik. planas</th><th class="num">Laik. faktas</th>
+              <th class="num">Nuokrypis</th><th>Statusas</th>
+            </tr></thead>
+            <tbody id="p1-tbody"></tbody>
+            <tfoot id="p1-tfoot"></tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- P2: Sąnaudų kategorijos -->
+    <div class="page" id="p2">
+      <div class="kpi-row" id="p2-kpis"></div>
+      <div class="chart-row">
+        <div class="chart-panel">
+          <div class="chart-head">
+            <div>
+              <div class="chart-title">Biudžetas ir faktas pagal kategoriją</div>
+              <div class="chart-sub" id="p2-cat-sub"></div>
+            </div>
+            <div class="legend">
+              <span><span class="sw" style="background:var(--series-b)"></span>Biudžetas</span>
+              <span><span class="sw" style="background:var(--accent)"></span>Faktas</span>
+              <button type="button" class="btn-ghost small" id="p2-cat-reset" hidden>Išvalyti pasirinkimą</button>
+            </div>
+          </div>
+          <div class="chart-wrap"><canvas id="p2-chart-cat" aria-label="Biudžetas ir faktas pagal sąnaudų kategoriją"></canvas></div>
+        </div>
+        <div class="chart-panel">
+          <div class="chart-head">
+            <div>
+              <div class="chart-title">Planas ir faktas pagal mėnesį</div>
+              <div class="chart-sub" id="p2-month-sub"></div>
+            </div>
+            <div class="legend">
+              <span><span class="sw" style="background:var(--series-b)"></span>Planas</span>
+              <span><span class="sw" style="background:var(--accent)"></span>Faktas</span>
+              <button type="button" class="btn-ghost small" id="p2-month-reset" hidden>Išvalyti pasirinkimą</button>
+            </div>
+          </div>
+          <div class="chart-wrap" id="p2-month-wrap">
+            <canvas id="p2-chart-month" aria-label="Planas ir faktas pagal mėnesį"></canvas>
+            <div class="chart-tip" id="p2-tip"></div>
+          </div>
+        </div>
+      </div>
+      <div class="panel p2-table-panel">
+        <div class="table-title">Sąnaudų kategorijų suvestinė</div>
+        <div class="table-wrap">
+          <table id="p2-table">
+            <colgroup>
+              <col style="width:250px"><col style="width:120px"><col style="width:120px"><col style="width:116px"><col style="width:84px">
+              <col style="width:112px"><col style="width:112px"><col style="width:112px"><col style="width:90px">
+            </colgroup>
+            <thead><tr>
+              <th>Sąnaudų kategorija</th><th class="num">Biudžetas</th><th class="num">Faktas kaupiamai</th><th class="num">Likutis</th>
+              <th class="num">Panaudota</th><th class="num">Laik. planas</th><th class="num">Laik. faktas</th><th class="num">Nuokrypis</th><th>Statusas</th>
+            </tr></thead>
+            <tbody id="p2-tbody"></tbody>
+            <tfoot id="p2-tfoot"></tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- P3: Objekto biudžeto detalizacija (drill-through) -->
+    <div class="page" id="p3">
+      <div class="detail-head">
+        <button type="button" class="btn-back" id="p3-back">← Grįžti į objektų suvestinę</button>
+        <div class="detail-text">
+          <div class="detail-title" id="p3-title"></div>
+          <div class="detail-meta" id="p3-meta"></div>
+        </div>
+      </div>
+      <div class="kpi-row" id="p3-kpis"></div>
+      <div class="panel panel-fill">
+        <div class="table-title">Biudžeto eilutės: planas ir faktas<span class="hint">— spustelėkite kategoriją, kad suskleistumėte ar išskleistumėte eilutes</span></div>
+        <div class="table-wrap">
+          <table id="p3-table">
+            <colgroup>
+              <col style="width:262px"><col style="width:106px"><col style="width:106px"><col style="width:100px"><col style="width:100px">
+              <col style="width:100px"><col style="width:106px"><col style="width:106px"><col style="width:76px"><col style="width:86px">
+            </colgroup>
+            <thead><tr>
+              <th>Biudžeto eilutė</th><th class="num">Biudžetas</th><th class="num">Iki laikotarpio</th><th class="num">Laik. planas</th>
+              <th class="num">Laik. faktas</th><th class="num">Nuokrypis</th><th class="num">Faktas kaupiamai</th><th class="num">Likutis</th>
+              <th class="num">Panaudota</th><th>Statusas</th>
+            </tr></thead>
+            <tbody id="p3-tbody"></tbody>
+            <tfoot id="p3-tfoot"></tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ctx-menu" id="ctx-menu" role="menu">
+    <button type="button" class="ctx-item" id="ctx-drill" role="menuitem"><span class="ctx-icon">↗</span> Detali peržiūra</button>
+    <button type="button" class="ctx-item ctx-cancel" id="ctx-cancel" role="menuitem">Atšaukti</button>
+  </div>
+</div>
+
+<script>
+// ================= 1. Constants =================
+const LAST_MONTH = '2026-10';
+const MONTH_ABBR = ['Sau','Vas','Kov','Bal','Geg','Bir','Lie','Rgp','Rgs','Spa','Lap','Grd'];
+const MONTH_NAMES = ['Sausis','Vasaris','Kovas','Balandis','Gegužė','Birželis','Liepa','Rugpjūtis','Rugsėjis','Spalis','Lapkritis','Gruodis'];
+
+const CATS = [
+  { id: '1', name: 'Darbo užmokestis',          share: 0.243 },
+  { id: '2', name: 'Medžiagos',                 share: 0.475 },
+  { id: '3', name: 'Mechanizmai',               share: 0.031 },
+  { id: '4', name: 'Subranga',                  share: 0.212 },
+  { id: '5', name: 'Statybvietės išlaidos',     share: 0.004 },
+  { id: '6', name: 'Pridėtinės išlaidos',       share: 0.008 },
+  { id: '7', name: 'Administracinės išlaidos',  share: 0.027 }
+];
+const CAT_MAP = Object.fromEntries(CATS.map(c => [c.id, c]));
+
+const LINES = [
+  { cat: '1', code: '1.1', name: 'Darbininkų DU, su mokesčiais', share: 0.90, profile: 'bell' },
+  { cat: '1', code: '1.2', name: 'Inžinerinio personalo DU, su mokesčiais', share: 0.10, profile: 'flat' },
+  { cat: '2', code: '2.1', name: 'Žaliavos, gaminiai', share: 0.93, profile: 'bell' },
+  { cat: '2', code: '2.2', name: 'Pastoliai, klojiniai', share: 0.07, profile: 'bell' },
+  { cat: '3', code: '3.1', name: 'Mechanizmai (Bobcat, kranai, įrankiai)', share: 0.85, profile: 'flat' },
+  { cat: '3', code: '3.2', name: 'Kuras objekto mechanizmams', share: 0.15, profile: 'flat' },
+  { cat: '4', code: '4.1', name: 'UAB „Šilumos sistemos“ (ŠVOK)', share: 0.40, profile: 'bell' },
+  { cat: '4', code: '4.2', name: 'UAB „Grindų meistrai“ (cementinės grindys)', share: 0.15, profile: 'late' },
+  { cat: '4', code: '4.3', name: 'UAB „Tinko darbai“ (tinkavimas)', share: 0.25, profile: 'late' },
+  { cat: '4', code: '4.4', name: 'UAB „Silpnosios srovės“', share: 0.20, profile: 'late' },
+  { cat: '5', code: '5.1', name: 'Bio tualetai, vagončiai, tvoros, konteineriai', share: 0.15, profile: 'flat' },
+  { cat: '5', code: '5.2', name: 'Elektra, vanduo', share: 0.25, profile: 'flat' },
+  { cat: '5', code: '5.3', name: 'Kuras (automobilių kuro nurašymai)', share: 0.25, profile: 'flat' },
+  { cat: '5', code: '5.4', name: 'Sąvartyno paslaugos', share: 0.15, profile: 'flat' },
+  { cat: '5', code: '5.5', name: 'Objekto apsauga', share: 0.20, profile: 'flat' },
+  { cat: '6', code: '6.1', name: 'Patalpų nuoma', share: 0.32, profile: 'flat' },
+  { cat: '6', code: '6.2', name: 'Draudimai (CAR, garantijos, laidavimo raštai)', share: 0.36, profile: 'flat' },
+  { cat: '6', code: '6.3', name: 'Ryšių paslaugos', share: 0.03, profile: 'flat' },
+  { cat: '6', code: '6.4', name: 'Papildomos sąnaudos (automobilių remontas)', share: 0.08, profile: 'flat' },
+  { cat: '6', code: '6.5', name: 'Orgtechnika', share: 0.02, profile: 'flat' },
+  { cat: '6', code: '6.6', name: 'Valymo paslaugos prieš užbaigimą', share: 0.19, profile: 'late' },
+  { cat: '7', code: '7.1', name: 'Administracinės išlaidos (3 % nuo biudžetinės vertės)', share: 1.00, profile: 'flat' }
+];
+const LINE_MAP = Object.fromEntries(LINES.map(l => [l.code, l]));
+
+const OBJECTS = [
+  { id: 'OBJ-2025-003', name: 'Šiaulių kultūros centro rekonstrukcija', city: 'Šiauliai',       pm: 'Tomas Januškevičius', start: '2025-01', dur: 20, budget: 3263000, margin: 0.058, bias: 0.035 },
+  { id: 'OBJ-2025-007', name: 'Joniškio gimnazijos renovacija',         city: 'Joniškis',       pm: 'Rūta Petrauskienė',   start: '2025-03', dur: 14, budget: 1845000, margin: 0.064, bias: -0.045 },
+  { id: 'OBJ-2025-011', name: 'Radviliškio daugiabučių modernizavimas', city: 'Radviliškis',    pm: 'Darius Mockus',       start: '2025-05', dur: 19, budget: 2410000, margin: 0.052, bias: 0.095 },
+  { id: 'OBJ-2025-014', name: 'Kelmės sporto salės statyba',            city: 'Kelmė',          pm: 'Linas Šimkus',        start: '2025-08', dur: 16, budget: 2975000, margin: 0.061, bias: 0.02 },
+  { id: 'OBJ-2025-019', name: 'Logistikos sandėlis Šiauliuose',         city: 'Šiauliai',       pm: 'Tomas Januškevičius', start: '2025-10', dur: 12, budget: 1520000, margin: 0.071, bias: -0.06 },
+  { id: 'OBJ-2026-002', name: 'Akmenės ligoninės korpusas',             city: 'Naujoji Akmenė', pm: 'Rūta Petrauskienė',   start: '2026-01', dur: 18, budget: 4380000, margin: 0.049, bias: 0.07 },
+  { id: 'OBJ-2026-005', name: 'Pakruojo bendruomenės namai',            city: 'Pakruojis',      pm: 'Darius Mockus',       start: '2026-02', dur: 10, budget: 1265000, margin: 0.066, bias: -0.02 },
+  { id: 'OBJ-2026-008', name: 'Mažeikių administracinis pastatas',      city: 'Mažeikiai',      pm: 'Linas Šimkus',        start: '2026-04', dur: 14, budget: 3120000, margin: 0.055, bias: 0.13 },
+  { id: 'OBJ-2026-012', name: 'Universiteto bendrabučio renovacija',    city: 'Šiauliai',       pm: 'Tomas Januškevičius', start: '2026-06', dur: 16, budget: 2690000, margin: 0.060, bias: 0.0 },
+  { id: 'OBJ-2026-015', name: 'Telšių vaikų darželis',                  city: 'Telšiai',        pm: 'Jelena Žukova',       start: '2026-08', dur: 12, budget: 1980000, margin: 0.063, bias: 0.03 }
+];
+const OBJ_MAP = Object.fromEntries(OBJECTS.map(o => [o.id, o]));
+
+const round2 = v => Math.round(v * 100) / 100;
+function addMonths(ym, k) {
+  let y = +ym.slice(0, 4), m = +ym.slice(5, 7) - 1 + k;
+  y += Math.floor(m / 12); m = ((m % 12) + 12) % 12;
+  return y + '-' + String(m + 1).padStart(2, '0');
+}
+function seededRand(seed) {
+  let s = seed;
+  return function () {
+    s = (s * 1664525 + 1013904223) & 0xffffffff;
+    return (s >>> 0) / 0xffffffff;
+  };
+}
+function weights(profile, D) {
+  const w = [];
+  for (let t = 0; t < D; t++) {
+    if (profile === 'flat') w.push(1);
+    else if (profile === 'bell') w.push(Math.sin(Math.PI * (t + 0.5) / D) + 0.15);
+    else w.push(t < D * 0.4 ? 0 : Math.sin(Math.PI * (t - D * 0.4 + 0.5) / (D * 0.6)) + 0.1);
+  }
+  const s = w.reduce((a, b) => a + b, 0) || 1;
+  return w.map(v => v / s);
+}
+
+// Biudžeto eilutės (planas visam objektui) ir mėnesiniai planas / faktas (HANSA faktas)
+const BUDGET = [];
+const DATA = [];
+OBJECTS.forEach((o, oi) => {
+  o.end = addMonths(o.start, o.dur - 1);
+  o.stage = o.end <= LAST_MONTH ? 'Užbaigtas' : 'Vykdomas';
+  let total = 0;
+  LINES.forEach((ln, li) => {
+    const cat = CAT_MAP[ln.cat];
+    const lineBudget = round2(o.budget * cat.share * ln.share);
+    total += lineBudget;
+    BUDGET.push({ obj: o.id, code: ln.code, cat: ln.cat, budget: lineBudget });
+    const rand = seededRand(oi * 1000 + li * 37 + 11); rand(); rand();
+    let lineBias = (rand() - 0.5) * 0.16;
+    if (ln.cat === '5') lineBias += 0.45;
+    const w = weights(ln.profile, o.dur);
+    let acc = 0;
+    for (let t = 0; t < o.dur; t++) {
+      const month = addMonths(o.start, t);
+      const plan = t === o.dur - 1 ? round2(lineBudget - acc) : round2(lineBudget * w[t]);
+      acc = round2(acc + plan);
+      const r1 = rand(), r2 = rand();
+      if (month > LAST_MONTH) continue;
+      const mult = ln.cat === '7' ? 1 + o.bias * 0.3 + (r1 - 0.5) * 0.04 : 1 + o.bias + lineBias + (r1 - 0.5) * 0.4;
+      let fact = plan > 0 ? round2(Math.max(0, plan * mult)) : 0;
+      if (ln.cat === '4' && plan > 0 && r2 < 0.1) fact = 0;
+      DATA.push({ obj: o.id, code: ln.code, cat: ln.cat, month, plan, fact });
+    }
+  });
+  o.budgetTotal = round2(total);
+  o.contract = round2(total * (1 + o.margin));
+});
+const FIRST_MONTH = DATA.reduce((m, r) => (r.month < m ? r.month : m), LAST_MONTH);
+
+// ================= 2. State =================
+let currentPage = 'p1';
+let currentRow = null;
+let selectedObj = null;
+let chartFilter = { dim: null, val: null };
+let chartHits = { cat: [], month: [] };
+let monthHover = -1;
+let monthChartData = [];
+let expandedCats = {};
+let ctxRow = null;
+let ACCENT = '#3B4B8C';
+
+// ================= 3. Boot =================
+document.addEventListener('DOMContentLoaded', () => {
+  ACCENT = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#3B4B8C';
+  document.getElementById('ts').textContent = getTimestamp();
+  populateDropdowns();
+  bindEvents();
+  applyFilters();
+});
+
+function populateDropdowns() {
+  const fill = (id, opts, def) => {
+    const sel = document.getElementById(id);
+    sel.innerHTML = '';
+    opts.forEach(o => {
+      const op = document.createElement('option');
+      op.value = o.value; op.textContent = o.label;
+      sel.appendChild(op);
+    });
+    sel.value = def;
+  };
+  const years = [...new Set(DATA.map(r => r.month.slice(0, 4)))].sort();
+  fill('f-year', [{ value: '', label: 'Visi' }].concat(years.map(y => ({ value: y, label: y }))), '2026');
+  fill('f-month', [{ value: '', label: 'Visi mėnesiai' }].concat(MONTH_NAMES.map((n, i) => ({ value: String(i + 1).padStart(2, '0'), label: n }))), '10');
+  fill('f-obj', [{ value: '', label: 'Visi objektai' }].concat(OBJECTS.map(o => ({ value: o.id, label: o.id + ' ' + o.name }))), '');
+  const pms = [...new Set(OBJECTS.map(o => o.pm))].sort((a, b) => a.localeCompare(b, 'lt'));
+  fill('f-pm', [{ value: '', label: 'Visi vadovai' }].concat(pms.map(p => ({ value: p, label: p }))), '');
+  fill('f-cat', [{ value: '', label: 'Visos kategorijos' }].concat(CATS.map(c => ({ value: c.id, label: c.id + '. ' + c.name }))), '');
+  fill('f-stage', [{ value: '', label: 'Visi etapai' }, { value: 'Vykdomas', label: 'Vykdomas' }, { value: 'Užbaigtas', label: 'Užbaigtas' }], '');
+}
+
+function bindEvents() {
+  document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => showPage(t.dataset.page, t)));
+  document.getElementById('btn-reset').addEventListener('click', resetFilters);
+  document.getElementById('chip-chart').addEventListener('click', clearChartFilter);
+  document.getElementById('p2-cat-reset').addEventListener('click', clearChartFilter);
+  document.getElementById('p2-month-reset').addEventListener('click', clearChartFilter);
+  document.getElementById('p3-back').addEventListener('click', backToP1);
+
+  document.getElementById('ctx-drill').addEventListener('click', e => {
+    e.stopPropagation();
+    const row = ctxRow;
+    hideCtxMenu();
+    if (row) drillTo(row);
+  });
+  document.getElementById('ctx-cancel').addEventListener('click', e => { e.stopPropagation(); hideCtxMenu(); });
+  document.addEventListener('click', hideCtxMenu);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') hideCtxMenu(); });
+
+  const cCat = document.getElementById('p2-chart-cat');
+  cCat.addEventListener('mousemove', e => {
+    const h = hitAt(cCat, chartHits.cat, e);
+    cCat.style.cursor = h ? 'pointer' : 'default';
+  });
+  cCat.addEventListener('click', e => {
+    const h = hitAt(cCat, chartHits.cat, e);
+    if (h) setChartFilter('cat', h.val);
+  });
+
+  const cMonth = document.getElementById('p2-chart-month');
+  cMonth.addEventListener('mousemove', e => {
+    const h = hitAt(cMonth, chartHits.month, e);
+    cMonth.style.cursor = h ? 'pointer' : 'default';
+    const idx = h ? h.i : -1;
+    if (idx !== monthHover) { monthHover = idx; drawMonthChart(); }
+    showMonthTip(h);
+  });
+  cMonth.addEventListener('mouseleave', () => {
+    monthHover = -1; showMonthTip(null); drawMonthChart();
+  });
+  cMonth.addEventListener('click', e => {
+    const h = hitAt(cMonth, chartHits.month, e);
+    if (h) setChartFilter('month', h.val);
+  });
+
+  let resizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      const page = document.getElementById(currentPage);
+      if (page && page.querySelector('canvas')) drawAllCharts();
+    }, 150);
+  });
+}
+
+// ================= 4. Navigation =================
+function showPage(id, tabEl) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const target = document.getElementById(id);
+  target.classList.add('active');
+  document.querySelector('.filterbar').style.display = id === 'p3' ? 'none' : '';
+  updateTabs(tabEl);
+  currentPage = id;
+  hideCtxMenu();
+  if (id !== 'p3') applyFilters();
+}
+function updateTabs(activeEl) {
+  if (!activeEl) return;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t === activeEl));
+}
+function backToP1() {
+  document.querySelector('.filterbar').style.display = '';
+  showPage('p1', document.querySelector('[data-page="p1"]'));
+}
+
+// ================= 5. Filtering =================
+function readFilters() {
+  return {
+    year: document.getElementById('f-year').value,
+    month: document.getElementById('f-month').value,
+    obj: document.getElementById('f-obj').value,
+    pm: document.getElementById('f-pm').value,
+    cat: document.getElementById('f-cat').value,
+    stage: document.getElementById('f-stage').value
+  };
+}
+function objOk(id, f) {
+  const o = OBJ_MAP[id];
+  if (!o) return false;
+  if (f.obj && o.id !== f.obj) return false;
+  if (f.pm && o.pm !== f.pm) return false;
+  if (f.stage && o.stage !== f.stage) return false;
+  return true;
+}
+function catOk(cat, f, ignoreChart) {
+  if (f.cat && cat !== f.cat) return false;
+  if (!ignoreChart && chartFilter.dim === 'cat' && cat !== chartFilter.val) return false;
+  return true;
+}
+function inPeriod(month, f) {
+  if (chartFilter.dim === 'month') return month === chartFilter.val;
+  if (f.year && month.slice(0, 4) !== f.year) return false;
+  if (f.month && month.slice(5, 7) !== f.month) return false;
+  return true;
+}
+function cumEndOf(f) {
+  if (chartFilter.dim === 'month') return chartFilter.val;
+  if (f.year && f.month) return f.year + '-' + f.month;
+  if (f.year) return f.year + '-12';
+  return '9999-12';
+}
+function periodLabel(f) {
+  if (chartFilter.dim === 'month') return chartFilter.val;
+  if (f.year && f.month) return f.year + '-' + f.month;
+  if (f.year) return f.year + ' m.';
+  return 'visas laikotarpis';
+}
+function getFilteredData(opts) {
+  const f = readFilters();
+  const ignoreChart = opts && opts.ignoreChartCat;
+  const cumEnd = cumEndOf(f);
+  const B = BUDGET.filter(r => objOk(r.obj, f) && catOk(r.cat, f, ignoreChart));
+  const base = DATA.filter(r => objOk(r.obj, f) && catOk(r.cat, f, ignoreChart));
+  const C = base.filter(r => r.month <= cumEnd);
+  const P = base.filter(r => inPeriod(r.month, f));
+  return {
+    f, B, C, P, cumEnd,
+    cumLabel: cumEnd > LAST_MONTH ? LAST_MONTH : cumEnd,
+    periodLabel: periodLabel(f)
+  };
+}
+function syncFilterControls() {
+  const y = document.getElementById('f-year');
+  const m = document.getElementById('f-month');
+  m.disabled = !y.value;
+  if (!y.value) m.value = '';
+  if (chartFilter.dim === 'month' && y.value && chartFilter.val.slice(0, 4) !== y.value) {
+    chartFilter = { dim: null, val: null };
+  }
+}
+function applyFilters() {
+  syncFilterControls();
+  const D = getFilteredData();
+  renderKPIs('p1', D);
+  renderKPIs('p2', D);
+  renderObjTable(D);
+  renderCatTable(D);
+  renderChartFilterUI();
+  if (currentPage === 'p2') {
+    requestAnimationFrame(() => requestAnimationFrame(drawAllCharts));
+  }
+}
+function resetFilters() {
+  document.getElementById('f-year').value = '2026';
+  document.getElementById('f-month').value = '10';
+  ['f-obj', 'f-pm', 'f-cat', 'f-stage'].forEach(id => { document.getElementById(id).value = ''; });
+  chartFilter = { dim: null, val: null };
+  applyFilters();
+}
+function setChartFilter(dim, val) {
+  if (chartFilter.dim === dim && chartFilter.val === val) chartFilter = { dim: null, val: null };
+  else chartFilter = { dim, val };
+  applyFilters();
+}
+function clearChartFilter() {
+  chartFilter = { dim: null, val: null };
+  applyFilters();
+}
+function renderChartFilterUI() {
+  const chip = document.getElementById('chip-chart');
+  if (chartFilter.dim) {
+    const txt = chartFilter.dim === 'cat' ? CAT_MAP[chartFilter.val].name : chartFilter.val;
+    chip.textContent = 'Diagrama: ' + txt + '  ✕';
+    chip.title = 'Išvalyti diagramos filtrą';
+    chip.hidden = false;
+  } else chip.hidden = true;
+  document.getElementById('p2-cat-reset').hidden = chartFilter.dim !== 'cat';
+  document.getElementById('p2-month-reset').hidden = chartFilter.dim !== 'month';
+}
+
+// ================= 6. Formatting helpers =================
+function formatEUR(value) {
+  const v = Number(value) || 0;
+  return Math.abs(v).toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €' ;
+}
+function formatEURSigned(value) {
+  const v = round2(Number(value) || 0);
+  return (v < 0 ? '−' : '') + formatEUR(v);
+}
+function formatPercent(value) {
+  const v = Number(value) || 0;
+  return (v < 0 ? '−' : '') + Math.abs(v).toLocaleString('lt-LT', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' %';
+}
+function formatDelta(d) {
+  const v = round2(d);
+  if (Math.abs(v) < 0.005) return formatEUR(0);
+  return (v > 0 ? '+' : '−') + formatEUR(v);
+}
+function deltaClass(d) {
+  const v = round2(d);
+  return v > 0.004 ? 'delta-bad' : v < -0.004 ? 'delta-good' : '';
+}
+function formatDate(value) { return value; }
+function fmtCompact(v) {
+  const a = Math.abs(v); let s;
+  if (a >= 1e6) s = (a / 1e6).toLocaleString('lt-LT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' M €';
+  else if (a >= 1e3) s = (a / 1e3).toLocaleString('lt-LT', { maximumFractionDigits: a >= 1e5 ? 0 : 1 }) + ' K €';
+  else s = Math.round(a) + ' €';
+  return (v < 0 ? '−' : '') + s;
+}
+function getTimestamp() {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  const hh = String(now.getHours()).padStart(2, '0');
+  const min = String(now.getMinutes()).padStart(2, '0');
+  return `Atnaujinta: ${yyyy}-${mm}-${dd} ${hh}:${min}`;
+}
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// ================= 7. Rendering =================
+function aggregate(B, C, P, keyFn) {
+  const m = new Map();
+  const get = k => { if (!m.has(k)) m.set(k, { key: k, budget: 0, cum: 0, plan: 0, fact: 0 }); return m.get(k); };
+  B.forEach(r => { get(keyFn(r)).budget += r.budget; });
+  C.forEach(r => { get(keyFn(r)).cum += r.fact; });
+  P.forEach(r => { const a = get(keyFn(r)); a.plan += r.plan; a.fact += r.fact; });
+  return m;
+}
+function totalsOf(B, C, P) {
+  const t = { budget: 0, cum: 0, plan: 0, fact: 0 };
+  B.forEach(r => { t.budget += r.budget; });
+  C.forEach(r => { t.cum += r.fact; });
+  P.forEach(r => { t.plan += r.plan; t.fact += r.fact; });
+  return t;
+}
+function statusOf(a) {
+  if (round2(a.cum) > round2(a.budget) + 0.005) return 'Viršyta';
+  if (a.plan > 0 && a.fact > a.plan * 1.05) return 'Dėmesio';
+  return 'Norma';
+}
+function statusHtml(st) {
+  const cls = st === 'Viršyta' ? 'status-bad' : st === 'Dėmesio' ? 'status-warn' : 'status-good';
+  return `<span class="status ${cls}"><span class="status-dot"></span><span>${esc(st)}</span></span>`;
+}
+function usedPct(a) { return a.budget > 0 ? (a.cum / a.budget) * 100 : 0; }
+
+function kpiCard(label, value, extra, opts) {
+  opts = opts || {};
+  const style = opts.border ? ` style="border-left:3px solid ${opts.border}"` : '';
+  return `<div class="kpi${opts.wide ? ' wide' : ''}"${style}>
+    <div class="kpi-label" title="${esc(label)}">${esc(label)}</div>
+    <div class="kpi-value${opts.neg ? ' neg' : ''}">${value}</div>${extra || ''}</div>`;
+}
+function deltaLine(fact, plan, compact) {
+  if (!(plan > 0)) return { html: '<div class="kpi-delta neutral">Laikotarpiui planas nesudarytas</div>', border: null };
+  const d = round2(fact - plan);
+  const pct = (d / plan) * 100;
+  if (Math.abs(d) < 0.005) return { html: '<div class="kpi-delta neutral">Atitinka planą</div>', border: null };
+  const bad = d > 0;
+  const arrow = d > 0 ? '▲' : '▼';
+  const sign = d > 0 ? '+' : '−';
+  const txt = compact ? `${arrow} ${sign}${formatEUR(d)} vs planas` : `${arrow} ${sign}${formatEUR(d)} · ${sign}${formatPercent(Math.abs(pct))} vs planas`;
+  return { html: `<div class="kpi-delta ${bad ? 'bad' : 'good'}">${txt}</div>`, border: bad ? 'var(--danger)' : 'var(--success)' };
+}
+function renderKPIs(prefix, D) {
+  const el = document.getElementById(prefix + '-kpis');
+  const T = totalsOf(D.B, D.C, D.P);
+  const objAgg = aggregate(D.B, D.C, D.P, r => r.obj);
+  const objs = [...objAgg.values()].filter(a => a.budget > 0);
+  const counts = { Norma: 0, Dėmesio: 0, Viršyta: 0 };
+  objs.forEach(a => { counts[statusOf(a)]++; });
+  const lik = round2(T.budget - T.cum);
+  const dl = deltaLine(T.fact, T.plan);
+  const multi = `<div class="kpi-multi-row">
+      <span class="status-item status-good"><span class="dot"></span><span class="count">${counts.Norma}</span><span class="label">Norma</span></span>
+      <span class="status-item status-warn"><span class="dot"></span><span class="count">${counts.Dėmesio}</span><span class="label">Dėmesio</span></span>
+      <span class="status-item status-bad"><span class="dot"></span><span class="count">${counts.Viršyta}</span><span class="label">Viršyta</span></span>
+    </div>`;
+  el.innerHTML =
+    kpiCard('Biudžetas', formatEUR(T.budget), `<div class="kpi-sub">${objs.length} obj. patvirtintas biudžetas</div>`) +
+    kpiCard('Faktinės sąnaudos kaupiamai', formatEUR(T.cum), `<div class="kpi-sub">Iki ${D.cumLabel} imtinai</div>`) +
+    kpiCard('Biudžeto likutis', formatEURSigned(lik), `<div class="kpi-sub">Panaudota ${formatPercent(T.budget > 0 ? T.cum / T.budget * 100 : 0)} biudžeto</div>`, { neg: lik < 0 }) +
+    kpiCard('Laikotarpio faktas · ' + D.periodLabel, formatEUR(T.fact), dl.html, { border: dl.border }) +
+    `<div class="kpi wide"><div class="kpi-label">Objektų būsena</div>${multi}<div class="kpi-sub">Viršyta – faktas viršija biudžetą</div></div>`;
+}
+
+function rowCells(a) {
+  const lik = round2(a.budget - a.cum);
+  const pct = usedPct(a);
+  const d = a.fact - a.plan;
+  return `<td class="num">${formatEUR(a.budget)}</td>
+    <td class="num">${formatEUR(a.cum)}</td>
+    <td class="num ${lik < 0 ? 'neg' : ''}">${formatEURSigned(lik)}</td>
+    <td class="num ${pct > 100.0001 ? 'neg' : ''}">${formatPercent(pct)}</td>
+    <td class="num">${formatEUR(a.plan)}</td>
+    <td class="num">${formatEUR(a.fact)}</td>
+    <td class="num ${deltaClass(d)}">${formatDelta(d)}</td>`;
+}
+function footCells(t) {
+  const lik = round2(t.budget - t.cum);
+  const pct = t.budget > 0 ? t.cum / t.budget * 100 : 0;
+  const d = t.fact - t.plan;
+  return `<td class="num">${formatEUR(t.budget)}</td>
+    <td class="num">${formatEUR(t.cum)}</td>
+    <td class="num ${lik < 0 ? 'neg' : ''}">${formatEURSigned(lik)}</td>
+    <td class="num ${pct > 100.0001 ? 'neg' : ''}">${formatPercent(pct)}</td>
+    <td class="num">${formatEUR(t.plan)}</td>
+    <td class="num">${formatEUR(t.fact)}</td>
+    <td class="num ${deltaClass(d)}">${formatDelta(d)}</td>`;
+}
+
+function renderObjTable(D) {
+  const tbody = document.getElementById('p1-tbody');
+  const tfoot = document.getElementById('p1-tfoot');
+  const agg = aggregate(D.B, D.C, D.P, r => r.obj);
+  const rows = OBJECTS.map(o => agg.get(o.id)).filter(a => a && a.budget > 0);
+  tbody.innerHTML = '';
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td class="empty" colspan="10">Pagal pasirinktus filtrus duomenų nėra.</td></tr>';
+  } else {
+    rows.forEach(a => {
+      const o = OBJ_MAP[a.key];
+      const tr = document.createElement('tr');
+      tr.className = 'drill' + (selectedObj === o.id ? ' selected' : '');
+      tr.tabIndex = 0;
+      tr.innerHTML = `<td class="col-name" title="${esc(o.id + ' ' + o.name)}"><span class="code">${esc(o.id)}</span>${esc(o.name)}</td>
+        <td title="${esc(o.pm)}">${esc(o.pm)}</td>${rowCells(a)}<td>${statusHtml(statusOf(a))}</td>`;
+      tr.addEventListener('click', () => {
+        selectedObj = selectedObj === o.id ? null : o.id;
+        tbody.querySelectorAll('tr.drill').forEach(r => r.classList.remove('selected'));
+        if (selectedObj) tr.classList.add('selected');
+      });
+      tr.addEventListener('contextmenu', e => showCtxMenu(e, { obj: o.id }));
+      tr.addEventListener('keydown', e => {
+        if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
+          e.preventDefault();
+          const r = tr.getBoundingClientRect();
+          showCtxMenu({ preventDefault() {}, clientX: r.left + 120, clientY: r.bottom }, { obj: o.id });
+          document.getElementById('ctx-drill').focus();
+        }
+      });
+      tbody.appendChild(tr);
+    });
+  }
+  const t = totalsOf(D.B, D.C, D.P);
+  tfoot.innerHTML = `<tr><td class="total-label" colspan="2">Iš viso</td>${footCells(t)}<td></td></tr>`;
+}
+
+function renderCatTable(D) {
+  const tbody = document.getElementById('p2-tbody');
+  const tfoot = document.getElementById('p2-tfoot');
+  const agg = aggregate(D.B, D.C, D.P, r => r.cat);
+  const rows = CATS.map(c => agg.get(c.id)).filter(a => a && a.budget > 0);
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td class="empty" colspan="9">Pagal pasirinktus filtrus duomenų nėra.</td></tr>';
+  } else {
+    tbody.innerHTML = rows.map(a => {
+      const c = CAT_MAP[a.key];
+      return `<tr><td title="${esc(c.name)}"><span class="code">${c.id}.</span>${esc(c.name)}</td>${rowCells(a)}<td>${statusHtml(statusOf(a))}</td></tr>`;
+    }).join('');
+  }
+  const t = totalsOf(D.B, D.C, D.P);
+  tfoot.innerHTML = `<tr><td class="total-label">Iš viso</td>${footCells(t)}<td></td></tr>`;
+}
+
+// ---------- Charts ----------
+function prepareCanvas(canvas) {
+  const parent = canvas.parentElement;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const rect = parent.getBoundingClientRect();
+  const cssWidth = Math.max(240, Math.floor(rect.width));
+  const cssHeight = Math.max(120, Math.floor(rect.height));
+  canvas.style.width = cssWidth + 'px';
+  canvas.style.height = cssHeight + 'px';
+  canvas.width = Math.floor(cssWidth * dpr);
+  canvas.height = Math.floor(cssHeight * dpr);
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, width: cssWidth, height: cssHeight };
+}
+function niceScale(dataMax, steps) {
+  if (!(dataMax > 0)) return { max: 10, step: 2 };
+  const rawStep = dataMax / steps;
+  const mag = Math.pow(10, Math.floor(Math.log10(rawStep)));
+  const normalized = rawStep / mag;
+  let niceStep;
+  if (normalized <= 1) niceStep = 1;
+  else if (normalized <= 2) niceStep = 2;
+  else if (normalized <= 5) niceStep = 5;
+  else niceStep = 10;
+  const step = niceStep * mag;
+  const max = Math.ceil(dataMax / step) * step;
+  return { max, step };
+}
+function hitAt(canvas, hits, e) {
+  const r = canvas.getBoundingClientRect();
+  const x = e.clientX - r.left, y = e.clientY - r.top;
+  return hits.find(h => x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h) || null;
+}
+function drawEmpty(ctx, w, h) {
+  ctx.fillStyle = '#6B7280';
+  ctx.font = '12px "Segoe UI", system-ui, sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('Pagal pasirinktus filtrus duomenų nėra.', w / 2, h / 2);
+}
+function drawAllCharts() {
+  if (currentPage !== 'p2') return;
+  drawCatChart();
+  drawMonthChart();
+}
+
+function drawCatChart() {
+  const canvas = document.getElementById('p2-chart-cat');
+  const { ctx, width: w, height: h } = prepareCanvas(canvas);
+  ctx.clearRect(0, 0, w, h);
+  chartHits.cat = [];
+  const D = getFilteredData({ ignoreChartCat: true });
+  document.getElementById('p2-cat-sub').textContent = 'Faktas iki ' + D.cumLabel + ' · spustelėkite juostą';
+  const agg = aggregate(D.B, D.C, [], r => r.cat);
+  const items = CATS.map(c => {
+    const a = agg.get(c.id);
+    return a && a.budget > 0 ? { id: c.id, label: c.id + '. ' + c.name, budget: a.budget, cum: a.cum } : null;
+  }).filter(Boolean);
+  if (!items.length) { drawEmpty(ctx, w, h); return; }
+
+  const font = '10px "Segoe UI", system-ui, sans-serif';
+  ctx.font = font;
+  let labelW = 0;
+  items.forEach(it => { labelW = Math.max(labelW, ctx.measureText(it.label).width); });
+  labelW = Math.min(Math.ceil(labelW) + 10, w * 0.35);
+  const pctTxt = items.map(it => formatPercent(it.budget > 0 ? it.cum / it.budget * 100 : 0));
+  let valW = 0;
+  pctTxt.forEach(t => { valW = Math.max(valW, ctx.measureText(t).width); });
+  valW = Math.ceil(valW) + 12;
+
+  const padT = 4, padB = 18;
+  const barArea = Math.max(40, w - labelW - valW - 6);
+  const dataMax = Math.max(0, ...items.map(it => Math.max(it.budget, it.cum)));
+  const { max: axMax } = niceScale(dataMax, 4);
+  const chartH = h - padT - padB;
+
+  // grid
+  ctx.textBaseline = 'top';
+  for (let i = 0; i <= 4; i++) {
+    const x = labelW + barArea * i / 4;
+    ctx.strokeStyle = '#F0F0F0'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(Math.round(x) + 0.5, padT); ctx.lineTo(Math.round(x) + 0.5, padT + chartH); ctx.stroke();
+    ctx.fillStyle = '#9E9E9E';
+    ctx.textAlign = i === 0 ? 'left' : i === 4 ? 'right' : 'center';
+    ctx.fillText(fmtCompact(axMax * i / 4), x, padT + chartH + 5);
+  }
+
+  const n = items.length;
+  const rowH = chartH / n;
+  const groupH = Math.min(rowH * 0.62, 24);
+  const barH = Math.max(2, groupH / 2 - 1);
+  const sel = chartFilter.dim === 'cat' ? chartFilter.val : null;
+
+  items.forEach((it, i) => {
+    const yRow = padT + i * rowH;
+    const y0 = yRow + (rowH - groupH) / 2;
+    ctx.globalAlpha = sel && sel !== it.id ? 0.3 : 1;
+    // label
+    ctx.font = sel === it.id ? 'bold ' + font : font;
+    ctx.fillStyle = '#6B7280';
+    ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    let lbl = it.label;
+    while (ctx.measureText(lbl).width > labelW - 8 && lbl.length > 4) lbl = lbl.slice(0, -2) + '…';
+    ctx.fillText(lbl, labelW - 6, y0 + groupH / 2);
+    // bars
+    const bw = Math.min(barArea, (it.budget / axMax) * barArea);
+    const fw = Math.min(barArea, (it.cum / axMax) * barArea);
+    ctx.fillStyle = '#9CA3AF';
+    ctx.beginPath(); ctx.fillRect(labelW, y0, Math.max(bw, it.budget > 0 ? 1 : 0), barH);
+    ctx.fillStyle = ACCENT;
+    ctx.beginPath(); ctx.fillRect(labelW, y0 + barH + 2, Math.max(fw, it.cum > 0 ? 1 : 0), barH);
+    // value (fixed right zone)
+    const over = it.cum > it.budget + 0.005;
+    ctx.font = over ? 'bold ' + font : font;
+    ctx.fillStyle = over ? '#DC2626' : '#374151';
+    ctx.textAlign = 'left';
+    ctx.fillText(pctTxt[i], labelW + barArea + 8, y0 + groupH / 2);
+    ctx.globalAlpha = 1;
+    chartHits.cat.push({ x: 0, y: yRow, w: w, h: rowH, val: it.id });
+  });
+  ctx.globalAlpha = 1;
+}
+
+function chartMonths(f) {
+  let start = FIRST_MONTH, end = LAST_MONTH;
+  if (f.year) {
+    start = f.year + '-01';
+    end = (f.year + '-12') < LAST_MONTH ? f.year + '-12' : LAST_MONTH;
+    if (start < FIRST_MONTH) start = FIRST_MONTH;
+  }
+  const list = [];
+  let m = start, guard = 0;
+  while (m <= end && guard < 120) { list.push(m); m = addMonths(m, 1); guard++; }
+  return list;
+}
+function drawMonthChart() {
+  const canvas = document.getElementById('p2-chart-month');
+  const { ctx, width: w, height: h } = prepareCanvas(canvas);
+  ctx.clearRect(0, 0, w, h);
+  chartHits.month = [];
+  const f = readFilters();
+  const months = chartMonths(f);
+  const sub = f.year ? f.year + ' m.' : FIRST_MONTH.slice(0, 4) + '–' + LAST_MONTH.slice(0, 4) + ' m.';
+  document.getElementById('p2-month-sub').textContent = sub + ' · spustelėkite mėnesį';
+  const map = new Map(months.map(m => [m, { month: m, plan: 0, fact: 0 }]));
+  DATA.forEach(r => {
+    if (!map.has(r.month) || !objOk(r.obj, f) || !catOk(r.cat, f, false)) return;
+    const a = map.get(r.month); a.plan += r.plan; a.fact += r.fact;
+  });
+  const items = months.map(m => map.get(m));
+  monthChartData = items;
+  const dataMax = Math.max(0, ...items.map(a => Math.max(a.plan, a.fact)));
+  if (!items.length || dataMax <= 0) { drawEmpty(ctx, w, h); return; }
+
+  const font = '10px "Segoe UI", system-ui, sans-serif';
+  ctx.font = font;
+  const { max: axMax } = niceScale(dataMax, 4);
+  let padL = 0;
+  for (let i = 0; i <= 4; i++) padL = Math.max(padL, ctx.measureText(fmtCompact(axMax * i / 4)).width);
+  padL = Math.ceil(padL) + 10;
+  const padR = 6, padT = 8, padB = 20;
+  const chartW = w - padL - padR, chartH = h - padT - padB;
+
+  ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  for (let i = 0; i <= 4; i++) {
+    const y = padT + chartH - chartH * i / 4;
+    ctx.strokeStyle = i === 0 ? '#D1D5DB' : '#F0F0F0'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(padL, Math.round(y) + 0.5); ctx.lineTo(padL + chartW, Math.round(y) + 0.5); ctx.stroke();
+    ctx.fillStyle = '#9E9E9E';
+    ctx.fillText(fmtCompact(axMax * i / 4), padL - 6, y);
+  }
+
+  const n = items.length;
+  const groupW = chartW / n;
+  const pairW = Math.min(groupW * 0.65, 44);
+  const barW = Math.max(1, pairW / 2 - 1);
+  const sel = chartFilter.dim === 'month' ? chartFilter.val : (f.year && f.month ? f.year + '-' + f.month : null);
+  const labelStep = Math.max(1, Math.ceil(n * 30 / chartW));
+  const yOf = v => Math.max(padT, Math.min(padT + chartH, padT + chartH - (v / axMax) * chartH));
+
+  items.forEach((a, i) => {
+    const gx = padL + i * groupW;
+    if (i === monthHover) {
+      ctx.fillStyle = '#EEF1F9';
+      ctx.fillRect(gx, padT, groupW, chartH);
+    }
+    if (i > 0 && a.month.slice(5) === '01') {
+      ctx.strokeStyle = '#E0E0E0'; ctx.setLineDash([3, 3]);
+      ctx.beginPath(); ctx.moveTo(Math.round(gx) + 0.5, padT); ctx.lineTo(Math.round(gx) + 0.5, padT + chartH); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    ctx.globalAlpha = sel && sel !== a.month ? 0.3 : 1;
+    const x0 = gx + (groupW - pairW) / 2;
+    const yp = yOf(a.plan), yf = yOf(a.fact);
+    ctx.fillStyle = '#9CA3AF';
+    ctx.beginPath(); ctx.fillRect(x0, yp, barW, padT + chartH - yp);
+    ctx.fillStyle = ACCENT;
+    ctx.beginPath(); ctx.fillRect(x0 + barW + 2, yf, barW, padT + chartH - yf);
+    ctx.globalAlpha = 1;
+    if (i % labelStep === 0 || a.month === sel) {
+      ctx.font = a.month === sel ? 'bold ' + font : font;
+      ctx.fillStyle = a.month === sel ? '#1A1A1A' : '#6B7280';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      ctx.fillText(MONTH_ABBR[+a.month.slice(5) - 1], gx + groupW / 2, padT + chartH + 5);
+    }
+    chartHits.month.push({ x: gx, y: padT, w: groupW, h: chartH, val: a.month, i });
+  });
+  ctx.globalAlpha = 1;
+  ctx.font = font;
+}
+function showMonthTip(hit) {
+  const tip = document.getElementById('p2-tip');
+  if (!hit || !monthChartData[hit.i]) { tip.style.display = 'none'; return; }
+  const a = monthChartData[hit.i];
+  const d = a.fact - a.plan;
+  const cls = deltaClass(d);
+  tip.innerHTML = `<b>${esc(a.month)}</b><br>Planas: ${formatEUR(a.plan)}<br>Faktas: ${formatEUR(a.fact)}<br>Nuokrypis: <span class="${cls}">${formatDelta(d)}</span>`;
+  tip.style.display = 'block';
+  const wrap = document.getElementById('p2-month-wrap');
+  const ww = wrap.getBoundingClientRect().width;
+  const tw = tip.offsetWidth;
+  let left = hit.x + hit.w + 8;
+  if (left + tw > ww) left = hit.x - tw - 8;
+  tip.style.left = Math.max(0, left) + 'px';
+  tip.style.top = '10px';
+}
+
+// ================= 8. Drill-through =================
+function showCtxMenu(e, row) {
+  e.preventDefault();
+  ctxRow = row;
+  const menu = document.getElementById('ctx-menu');
+  menu.classList.add('visible');
+  const x = Math.min(e.clientX, window.innerWidth - 200);
+  const y = Math.min(e.clientY, window.innerHeight - 100);
+  menu.style.left = x + 'px';
+  menu.style.top = y + 'px';
+}
+function hideCtxMenu() {
+  document.getElementById('ctx-menu').classList.remove('visible');
+  ctxRow = null;
+}
+function drillTo(row) {
+  currentRow = row;
+  selectedObj = row.obj;
+  expandedCats = {};
+  CATS.forEach(c => { expandedCats[c.id] = true; });
+  showPage('p3', null);
+  renderP2Detail();
+}
+// Detalės puslapis (P3 drill-through) — naudoja currentRow ir tuos pačius globalius filtrus
+function renderP2Detail() {
+  if (!currentRow) return;
+  const o = OBJ_MAP[currentRow.obj];
+  if (!o) return;
+  const f = readFilters();
+  const cumEnd = cumEndOf(f);
+  const cumLabel = cumEnd > LAST_MONTH ? LAST_MONTH : cumEnd;
+  const pLabel = periodLabel(f);
+  const B = BUDGET.filter(r => r.obj === o.id && catOk(r.cat, f, false));
+  const base = DATA.filter(r => r.obj === o.id && catOk(r.cat, f, false));
+  const C = base.filter(r => r.month <= cumEnd);
+  const P = base.filter(r => inPeriod(r.month, f));
+
+  const notes = [];
+  if (f.cat) notes.push('kategorija ' + CAT_MAP[f.cat].name);
+  if (chartFilter.dim === 'cat') notes.push('diagramos filtras ' + CAT_MAP[chartFilter.val].name);
+  document.getElementById('p3-title').textContent = o.id + ' ' + o.name;
+  document.getElementById('p3-meta').textContent =
+    `${o.city} | Projekto vadovas: ${o.pm} | Etapas: ${o.stage} (${o.start}–${o.end}) | Laikotarpis: ${pLabel}` +
+    (notes.length ? ' | Taikoma: ' + notes.join(', ') : '');
+
+  const T = totalsOf(B, C, P);
+  const lik = round2(T.budget - T.cum);
+  const result = round2(o.contract - o.budgetTotal);
+  const dl = deltaLine(T.fact, T.plan, true);
+  document.getElementById('p3-kpis').innerHTML =
+    kpiCard('Sutarties vertė', formatEUR(o.contract), '<div class="kpi-sub">Bendra sutarties vertė be PVM</div>') +
+    kpiCard('Biudžetinė vertė', formatEUR(T.budget), `<div class="kpi-sub">${notes.length ? 'Pagal taikomą filtrą' : 'Patvirtintas objekto biudžetas'}</div>`) +
+    kpiCard('Planuojamas rezultatas', formatEURSigned(result), `<div class="kpi-sub">${formatPercent(o.contract > 0 ? result / o.contract * 100 : 0)} nuo sutarties vertės</div>`) +
+    kpiCard('Faktinės sąnaudos kaupiamai', formatEUR(T.cum), `<div class="kpi-sub">Iki ${cumLabel} imtinai</div>`) +
+    kpiCard('Biudžeto likutis', formatEURSigned(lik), `<div class="kpi-sub">Panaudota ${formatPercent(T.budget > 0 ? T.cum / T.budget * 100 : 0)}</div>`, { neg: lik < 0 }) +
+    kpiCard('Laikotarpio faktas · ' + pLabel, formatEUR(T.fact), dl.html, { border: dl.border });
+
+  const lineAgg = aggregate(B, C, P, r => r.code);
+  const catAgg = aggregate(B, C, P, r => r.cat);
+  const tbody = document.getElementById('p3-tbody');
+  tbody.innerHTML = '';
+
+  const cells = a => {
+    const before = round2(a.cum - a.fact);
+    const lk = round2(a.budget - a.cum);
+    const pct = usedPct(a);
+    const d = a.fact - a.plan;
+    return `<td class="num">${formatEUR(a.budget)}</td>
+      <td class="num">${formatEUR(before)}</td>
+      <td class="num">${formatEUR(a.plan)}</td>
+      <td class="num">${formatEUR(a.fact)}</td>
+      <td class="num ${deltaClass(d)}">${formatDelta(d)}</td>
+      <td class="num">${formatEUR(a.cum)}</td>
+      <td class="num ${lk < 0 ? 'neg' : ''}">${formatEURSigned(lk)}</td>
+      <td class="num ${pct > 100.0001 ? 'neg' : ''}">${formatPercent(pct)}</td>
+      <td>${statusHtml(statusOf(a))}</td>`;
+  };
+
+  let any = false;
+  CATS.forEach(c => {
+    const ca = catAgg.get(c.id);
+    if (!ca || ca.budget <= 0) return;
+    any = true;
+    const expanded = expandedCats[c.id] !== false;
+    const gtr = document.createElement('tr');
+    gtr.className = 'group-row';
+    gtr.tabIndex = 0;
+    gtr.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    gtr.innerHTML = `<td class="group-header" title="${esc(c.name)}"><span class="toggle-icon">${expanded ? '▼' : '▶'}</span>${c.id}. ${esc(c.name)}</td>${cells(ca)}`;
+    const toggle = () => { expandedCats[c.id] = !expanded; renderP2Detail(); };
+    gtr.addEventListener('click', toggle);
+    gtr.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
+    tbody.appendChild(gtr);
+    if (expanded) {
+      LINES.filter(l => l.cat === c.id).forEach(l => {
+        const la = lineAgg.get(l.code);
+        if (!la) return;
+        const tr = document.createElement('tr');
+        tr.className = 'child-row';
+        tr.dataset.group = c.id;
+        tr.innerHTML = `<td class="child-label" title="${esc(l.code + ' ' + l.name)}"><span class="code">${l.code}</span>${esc(l.name)}</td>${cells(la)}`;
+        tbody.appendChild(tr);
+      });
+    }
+  });
+  if (!any) tbody.innerHTML = '<tr><td class="empty" colspan="10">Pagal pasirinktus filtrus duomenų nėra.</td></tr>';
+
+  const before = round2(T.cum - T.fact);
+  const d = T.fact - T.plan;
+  const pct = T.budget > 0 ? T.cum / T.budget * 100 : 0;
+  document.getElementById('p3-tfoot').innerHTML = `<tr><td class="total-label">Iš viso</td>
+    <td class="num">${formatEUR(T.budget)}</td><td class="num">${formatEUR(before)}</td>
+    <td class="num">${formatEUR(T.plan)}</td><td class="num">${formatEUR(T.fact)}</td>
+    <td class="num ${deltaClass(d)}">${formatDelta(d)}</td><td class="num">${formatEUR(T.cum)}</td>
+    <td class="num ${lik < 0 ? 'neg' : ''}">${formatEURSigned(lik)}</td>
+    <td class="num ${pct > 100.0001 ? 'neg' : ''}">${formatPercent(pct)}</td><td></td></tr>`;
+}
+</script>
+</body>
+</html>

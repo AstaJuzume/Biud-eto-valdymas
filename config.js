@@ -1,5 +1,4 @@
-// Paruošus atskirą ataskaitos prototipą, įrašykite visą jo HTTPS nuorodą.
-// Kol reportUrl tuščias, nuoroda „Ataskaita“ aplikacijoje nerodoma.
+// Ataskaitos prototipas laikomas kartu su aplikacija šioje repozitorijoje.
 window.VERSINA_CONFIG = {
-  reportUrl: ""
+  reportUrl: "./ataskaita.html"
 };

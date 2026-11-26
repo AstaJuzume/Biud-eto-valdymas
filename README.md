@@ -27,21 +27,18 @@ python3 -m http.server 8000
 
 Repozitorijos Settings → Pages pasirinkite Deploy from a branch, šaką `main` ir katalogą `/ (root)`. Visi resursų keliai santykiniai, todėl aplikacija palaiko repozitorijos `/Versina/` kelią.
 
-## Atskiro ataskaitos prototipo susiejimas
+## Ataskaitos prototipas
 
-Ataskaita kuriama ir talpinama atskirai. Kai bus paruošta jos nuoroda, faile `config.js` užpildykite:
+Ataskaita įkelta į `ataskaita.html` ir laikoma kartu su aplikacija. Aplikacijos šoniniame meniu spustelėjus **Ataskaita**, ji atidaroma naujame skirtuke. Ataskaitos viršuje yra nuoroda **Grįžti į aplikaciją**.
 
-```javascript
-window.VERSINA_CONFIG = {
-  reportUrl: "https://jusu-ataskaitos-prototipas.example"
-};
-```
+`config.js` nurodytas santykinis kelias `./ataskaita.html`, todėl susiejimas veikia ir repozitorijos `/Versina/` kelyje. Norint ateityje ataskaitą talpinti kitur, šį kelią galima pakeisti visa HTTPS nuoroda. Kol `reportUrl` tuščias, meniu nuoroda nerodoma.
 
-Aplikacijos šoniniame meniu automatiškai atsiras nuoroda **Ataskaita**, atidaranti prototipą naujame skirtuke. Kol `reportUrl` tuščias, nuoroda nerodoma. Abu prototipai turi savo atskirus duomenis ir prieigos nustatymus; nuoroda duomenų nesinchronizuoja.
+Abu prototipai turi atskirus demonstracinius duomenis; nuoroda duomenų nesinchronizuoja. Ataskaita nėra tikra Power BI integracija.
 
 ## Failai
 
 - `index.html` – aplikacijos pradžia.
 - `app.js` – demonstraciniai duomenys ir aplikacijos funkcijos.
 - `style.css` – adaptyvi „Power Apps“ stiliaus sąsaja.
-- `config.js` – atskiros ataskaitos prototipo nuoroda.
+- `config.js` – ataskaitos prototipo nuoroda.
+- `ataskaita.html` – interaktyvus ataskaitos prototipas su filtrais ir detalia peržiūra.

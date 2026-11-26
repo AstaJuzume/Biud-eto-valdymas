@@ -50,7 +50,7 @@ function metric(label,value,note='',cls=''){return `<div class="metric ${cls}"><
 function reportLink(){
  const raw=window.VERSINA_CONFIG?.reportUrl?.trim();
  if(!raw)return '';
- try{const u=new URL(raw);if(!['https:','http:'].includes(u.protocol))return '';return `<a class="navitem" href="${esc(u.href)}" target="_blank" rel="noopener noreferrer" style="text-decoration:none">${ic('chart')}<span>Ataskaita</span></a>`}catch{return ''}
+ try{const u=new URL(raw,document.baseURI);if(!['https:','http:'].includes(u.protocol))return '';return `<a class="navitem" href="${esc(u.href)}" target="_blank" rel="noopener noreferrer" style="text-decoration:none">${ic('chart')}<span>Ataskaita</span></a>`}catch{return ''}
 }
 function render(){
  const active=view==='object'?'objects':view;
