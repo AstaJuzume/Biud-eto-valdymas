@@ -1,4 +1,4 @@
-# VERSINA · Objektų biudžetų kontrolė
+# Objektų biudžetų kontrolė
 
 Interaktyvus „Power Apps“ stiliaus prototipas statybos objektų biudžetų planavimui ir faktinių sąnaudų peržiūrai.
 
@@ -25,13 +25,13 @@ python3 -m http.server 8000
 
 ## GitHub Pages
 
-Repozitorijos Settings → Pages pasirinkite Deploy from a branch, šaką `main` ir katalogą `/ (root)`. Visi resursų keliai santykiniai, todėl aplikacija palaiko repozitorijos `/Versina/` kelią.
+Repozitorijos Settings → Pages pasirinkite Deploy from a branch, šaką `main` ir katalogą `/ (root)`. Visi resursų keliai santykiniai, todėl aplikacija palaiko repozitorijos pakelį.
 
 ## Ataskaitos prototipas
 
 Ataskaita įkelta į `ataskaita.html` ir laikoma kartu su aplikacija. Aplikacijos šoniniame meniu spustelėjus **Ataskaita**, ji atidaroma naujame skirtuke. Ataskaitos viršuje yra nuoroda **Grįžti į aplikaciją**.
 
-`config.js` nurodytas santykinis kelias `./ataskaita.html`, todėl susiejimas veikia ir repozitorijos `/Versina/` kelyje. Norint ateityje ataskaitą talpinti kitur, šį kelią galima pakeisti visa HTTPS nuoroda. Kol `reportUrl` tuščias, meniu nuoroda nerodoma.
+`config.js` nurodytas santykinis kelias `./ataskaita.html?v=neutral-demo-4`, todėl susiejimas veikia ir repozitorijos pakelyje. Norint ateityje ataskaitą talpinti kitur, šį kelią galima pakeisti visa HTTPS nuoroda. Kol `reportUrl` tuščias, meniu nuoroda nerodoma.
 
 Abu prototipai turi atskirus demonstracinius duomenis; nuoroda duomenų nesinchronizuoja. Ataskaita nėra tikra Power BI integracija.
 
